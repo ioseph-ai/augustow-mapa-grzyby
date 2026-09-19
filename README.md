@@ -1,11 +1,14 @@
-# Augustów — mapa grzybowa (HTTPS)
+# Augustów — mapa grzybowa
 
-Publiczna mapa WMS (BDL + Geoportal) pod Augustów.
+## Link (po włączeniu Pages z brancha)
 
-## Linki
+**https://ioseph-ai.github.io/augustow-mapa-grzyby/**
 
-- GitHub Pages: https://ioseph-ai.github.io/augustow-mapa-grzyby/
-- jsDelivr (od razu): https://cdn.jsdelivr.net/gh/ioseph-ai/augustow-mapa-grzyby@main/index.html
-- raw.githack: https://raw.githack.com/ioseph-ai/augustow-mapa-grzyby/main/index.html
+## Jak włączyć (jednorazowo)
 
-Na iPhonie: otwórz link w Safari → Udostępnij → Do ekranu początkowego.
+1. Otwórz [Settings → Pages](https://github.com/ioseph-ai/augustow-mapa-grzyby/settings/pages)
+2. **Build and deployment → Source:** *Deploy from a branch* (nie GitHub Actions)
+3. Branch: **main** · folder: **/ (root)**
+4. Save — po ~1 min link powyżej powinien działać
+
+Na iPhonie: Safari → Udostępnij → Do ekranu początkowego.

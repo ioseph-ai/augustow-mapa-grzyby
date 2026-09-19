@@ -1,0 +1,2 @@
+# Disabled — use Pages "Deploy from a branch" (main / root) instead of Actions.
+# The Actions-based deploy failed at configure-pages when Pages site was not fully provisioned.
