@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1b4332" />
+  <title>Augustów — mapa grzybowa / BDL</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root {
+      --bg: #0f1a14;
+      --panel: #1b4332;
+      --panel2: #2d6a4f;
+      --text: #f1faee;
+      --muted: #b7e4c7;
+      --accent: #95d5b2;
+      --warn: #f4a261;
+      --danger: #e76f51;
+      --safe: #52b788;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+    header {
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, #1b4332, #081c15);
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      border-bottom: 1px solid #2d6a4f;
+    }
+    header h1 {
+      margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
+    }
+    header p { margin: 4px 0 0; font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+    .tabs {
+      display: flex; gap: 6px; margin-top: 10px;
+    }
+    .tabs button {
+      flex: 1; border: 0; border-radius: 999px; padding: 9px 10px;
+      font-size: 0.85rem; font-weight: 600; color: var(--text);
+      background: rgba(255,255,255,0.08);
+    }
+    .tabs button.active { background: var(--panel2); }
+    #map-wrap { flex: 1 1 auto; position: relative; min-height: 0; }
+    #map { width: 100%; height: 100%; background: #14261c; }
+    #hub {
+      display: none; flex: 1 1 auto; overflow: auto;
+      padding: 14px 14px calc(20px + env(safe-area-inset-bottom));
+      -webkit-overflow-scrolling: touch;
+    }
+    #hub.visible { display: block; }
+    #map-wrap.hidden { display: none; }
+    .card {
+      background: #13261c; border: 1px solid #2d6a4f; border-radius: 14px;
+      padding: 14px; margin-bottom: 12px;
+    }
+    .card h2 { margin: 0 0 8px; font-size: 1rem; }
+    .card p, .card li { font-size: 0.88rem; line-height: 1.45; color: var(--muted); }
+    .card ol, .card ul { margin: 8px 0 0; padding-left: 1.2rem; }
+    .btn {
+      display: block; width: 100%; text-align: center; text-decoration: none;
+      background: var(--panel2); color: var(--text); font-weight: 650;
+      border-radius: 12px; padding: 12px 14px; margin-top: 8px; font-size: 0.92rem;
+    }
+    .btn.secondary { background: rgba(255,255,255,0.08); border: 1px solid #40916c; }
+    .btn.store { background: #081c15; border: 1px solid var(--accent); }
+    .badge {
+      display: inline-block; font-size: 0.7rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 999px; vertical-align: middle;
+    }
+    .badge.ok { background: rgba(82,183,136,0.25); color: var(--safe); }
+    .badge.warn { background: rgba(244,162,97,0.25); color: var(--warn); }
+    .layer-panel {
+      position: absolute; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
+      z-index: 1000; background: rgba(15,26,20,0.92); backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px); border: 1px solid #2d6a4f; border-radius: 14px;
+      padding: 10px 12px; max-height: 42%; overflow: auto;
+    }
+    .layer-panel summary {
+      list-style: none; cursor: pointer; font-weight: 700; font-size: 0.9rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .layer-panel summary::-webkit-details-marker { display: none; }
+    .layer-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-top: 1px solid rgba(45,106,79,0.5);
+      font-size: 0.88rem;
+    }
+    .layer-row input { width: 18px; height: 18px; accent-color: var(--safe); }
+    .toolbar {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .fab {
+      width: 44px; height: 44px; border-radius: 12px; border: 1px solid #2d6a4f;
+      background: rgba(15,26,20,0.92); color: var(--text); font-size: 1.1rem;
+      font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    }
+    .status {
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      background: rgba(15,26,20,0.9); border: 1px solid #2d6a4f;
+      border-radius: 10px; padding: 6px 10px; font-size: 0.72rem; color: var(--muted);
+      max-width: calc(100% - 70px);
+    }
+    .note { font-size: 0.78rem; color: var(--warn); margin-top: 8px; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Augustów — mapa grzybowa / BDL</h1>
+      <p>Warstwy BDL + ortofoto. Wymaga Wi‑Fi/LTE (WMS). Offline: mBDL / QField.</p>
+      <div class="tabs" role="tablist">
+        <button type="button" id="tab-map" class="active" role="tab" aria-selected="true">Mapa</button>
+        <button type="button" id="tab-hub" role="tab" aria-selected="false">Aplikacje i wskazówki</button>
+      </div>
+    </header>
+
+    <div id="map-wrap">
+      <div id="map" role="application" aria-label="Mapa Augustowa"></div>
+      <div class="status" id="status">Ładowanie mapy…</div>
+      <div class="toolbar">
+        <button type="button" class="fab" id="btn-loc" title="Moja lokalizacja">◎</button>
+        <button type="button" class="fab" id="btn-home" title="Augustów">⌂</button>
+      </div>
+      <details class="layer-panel" open>
+        <summary>
+          <span>Warstwy</span>
+          <span class="badge ok" id="cors-badge">CORS OK</span>
+        </summary>
+        <div class="layer-row"><label><input type="checkbox" id="ly-osm" checked /> OSM (podkład)</label></div>
+        <div class="layer-row"><label><input type="checkbox" id="ly-orto" /> Ortofoto HR (Geoportal)</label></div>
+        <div class="layer-row"><label><input type="checkbox" id="ly-drzew" checked /> BDL drzewostany PGL LP</label></div>
+        <div class="layer-row"><label><input type="checkbox" id="ly-niezal" checked /> BDL niezalesione (proxy zrębów)</label></div>
+        <div class="layer-row"><label><input type="checkbox" id="ly-podzial" /> BDL podział (wydzielenia)</label></div>
+        <div class="layer-row"><label><input type="checkbox" id="ly-zakazy" checked /> BDL zakazy wstępu</label></div>
+        <p class="note">Przybliż do zoom&nbsp;13+ (limit skali BDL ~1:70&nbsp;000). W centrum miasta warstwa może być pusta — przesuń na lasy wokół Augustowa. Szukaj grzybów przy <strong>ścianie</strong> zrębu / w młodnikach — nie na środku świeżego zrębu. Sprawdź zakazy przed wejściem.</p>
+      </details>
+    </div>
+
+    <div id="hub">
+      <div class="card">
+        <h2>Co działa na iPhonie?</h2>
+        <p>
+          <span class="badge ok">Mapa w Safari</span>
+          Serwery BDL i Geoportal zwracają nagłówki CORS (odbijają <span class="mono">Origin</span>, także <span class="mono">null</span> dla pliku lokalnego).
+          Leaflet ładuje WMS jako obrazki — mapa powinna działać w Safari przy łączności.
+        </p>
+        <p style="margin-top:8px">
+          <span class="badge warn">Limit</span>
+          Otwarcie z iCloud Drive / Pliki: Leaflet jest lokalny (w folderze), ale kafelki OSM i WMS wymagają internetu.
+          Brak trybu offline w tej stronie HTML.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>1) mBDL — oficjalna apka Lasów</h2>
+        <p><strong>Nazwa w App Store:</strong> mBDL (mobilny Bank Danych o Lasach)<br />
+        Wydawca: Biuro Urządzania Lasu i Geodezji Leśnej. Darmowa. Mapy drzewostanowe, zakazy, ortofoto; offline po pobraniu nadleśnictw (limit ~3).</p>
+        <a class="btn store" href="https://apps.apple.com/pl/app/mbdl/id1388815663">Otwórz mBDL w App Store</a>
+        <a class="btn secondary" href="https://www.bdl.lasy.gov.pl/portal/mbdl">Strona mBDL (BDL)</a>
+      </div>
+
+      <div class="card">
+        <h2>2) QField for QGIS — ten sam projekt .qgz</h2>
+        <p><strong>Nazwa w App Store:</strong> QField for QGIS (OPENGIS.ch). Wymaga nowszego iOS.</p>
+        <a class="btn store" href="https://apps.apple.com/app/qfield-for-qgis/id1531726814">Otwórz QField w App Store</a>
+        <a class="btn secondary" href="qfield/QFIELD-iOS.md">Instrukcja QField (PL) — otwórz</a>
+        <p style="margin-top:8px">Plik projektu: <span class="mono">qfield/augustow-grzyby.qgz</span></p>
+      </div>
+
+      <div class="card">
+        <h2>3) Portale web (głębokie linki)</h2>
+        <p>Oficjalnego deep linku BDL z lat/lon <strong>nie znaleziono</strong> (portal ma narzędzie „permalink” w UI, bez udokumentowanych parametrów URL).</p>
+        <a class="btn" href="https://www.bdl.lasy.gov.pl/portal/mapy">BDL — mapa (wyszukaj „Augustów”)</a>
+        <a class="btn secondary" href="https://mapy.geoportal.gov.pl/imap/Imgp_2.html">Geoportal iMap (ortofoto / wyszukiwanie)</a>
+        <a class="btn secondary" href="https://www.openstreetmap.org/#map=13/53.8430/22.9790">OpenStreetMap — Augustów (53.843°N, 22.979°E)</a>
+        <a class="btn secondary" href="https://maps.apple.com/?ll=53.843,22.979&amp;z=13&amp;q=August%C3%B3w">Apple Maps — Augustów</a>
+      </div>
+
+      <div class="card">
+        <h2>4) Szybkie kroki QField na iOS</h2>
+        <ol>
+          <li>App Store → zainstaluj <strong>QField for QGIS</strong>.</li>
+          <li>Skopiuj <span class="mono">augustow-grzyby.qgz</span> na iPhone (AirDrop / iCloud Drive / Pliki).</li>
+          <li>W aplikacji <strong>Pliki</strong> naciśnij plik → Udostępnij → QField (lub Otwórz w QField).</li>
+          <li>Włącz lokalizację GPS.</li>
+          <li>W legendzie włącz: Ortofoto HR, Drzewostany, Niezalesione, Zakazy wstępu.</li>
+          <li>WMS działa tylko z Wi‑Fi/LTE — bez sieci warstwy BDL się nie załadują.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>WMS (dla ciekawskich)</h2>
+        <ul>
+          <li>Drzewostany / niezalesione: mapserver.bdl.lasy.gov.pl … WMS_BDL_mapa_drzewostanow (warstwy 1 i 5)</li>
+          <li>Podział: … WMS_BDL (warstwa 1)</li>
+          <li>Zakazy: … WMS_zakazy_wstepu_do_lasu (warstwa 3)</li>
+          <li>Orto HR: mapy.geoportal.gov.pl … ORTO/WMS/HighResolution (Raster)</li>
+        </ul>
+        <p class="note">Dane BDL są poglądowe. Przestrzegaj zakazów LP (uprawy &lt;4 m, rezerwaty, nasienne…).</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+  // Fix default marker icons when Leaflet is loaded from CDN
+  (function () {
+    if (!window.L) return;
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png'
+    });
+  })();
+</script>
+  <script>
+(function () {
+  var CENTER = [53.843, 22.979];
+  var ZOOM = 13;
+  var statusEl = document.getElementById('status');
+  var corsBadge = document.getElementById('cors-badge');
+
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  // Tabs
+  var tabMap = document.getElementById('tab-map');
+  var tabHub = document.getElementById('tab-hub');
+  var mapWrap = document.getElementById('map-wrap');
+  var hub = document.getElementById('hub');
+  function showMap() {
+    tabMap.classList.add('active'); tabHub.classList.remove('active');
+    tabMap.setAttribute('aria-selected', 'true'); tabHub.setAttribute('aria-selected', 'false');
+    mapWrap.classList.remove('hidden'); hub.classList.remove('visible');
+    setTimeout(function () { map.invalidateSize(); }, 50);
+  }
+  function showHub() {
+    tabHub.classList.add('active'); tabMap.classList.remove('active');
+    tabHub.setAttribute('aria-selected', 'true'); tabMap.setAttribute('aria-selected', 'false');
+    mapWrap.classList.add('hidden'); hub.classList.add('visible');
+  }
+  tabMap.addEventListener('click', showMap);
+  tabHub.addEventListener('click', showHub);
+
+  // Map
+  var map = L.map('map', {
+    zoomControl: false,
+    attributionControl: true
+  }).setView(CENTER, ZOOM);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  function wms(url, layers, opacity) {
+    return L.tileLayer.wms(url, {
+      layers: layers,
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      opacity: opacity == null ? 0.75 : opacity,
+      attribution: 'BDL / GUGiK',
+      maxZoom: 18
+    });
+  }
+
+  var orto = wms(
+    'https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution',
+    'Raster', 1
+  );
+  var drzew = wms(
+    'https://mapserver.bdl.lasy.gov.pl/arcgis/services/WMS_BDL_mapa_drzewostanow/MapServer/WMSServer',
+    '1', 0.7
+  );
+  var niezal = wms(
+    'https://mapserver.bdl.lasy.gov.pl/arcgis/services/WMS_BDL_mapa_drzewostanow/MapServer/WMSServer',
+    '5', 0.85
+  );
+  var podzial = wms(
+    'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_BDL/mapserver/WMSServer',
+    '1', 0.65
+  );
+  var zakazy = wms(
+    'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_zakazy_wstepu_do_lasu/MapServer/WMSServer',
+    '3', 0.8
+  );
+
+  drzew.addTo(map);
+  niezal.addTo(map);
+  zakazy.addTo(map);
+
+  L.circleMarker(CENTER, {
+    radius: 6, color: '#95d5b2', weight: 2, fillColor: '#52b788', fillOpacity: 0.8
+  }).addTo(map).bindPopup('<b>Augustów</b><br>53.843°N, 22.979°E');
+
+  function bindToggle(id, layer, basemap) {
+    var el = document.getElementById(id);
+    el.addEventListener('change', function () {
+      if (el.checked) {
+        layer.addTo(map);
+        if (basemap) layer.bringToBack();
+      } else {
+        map.removeLayer(layer);
+      }
+    });
+  }
+  bindToggle('ly-osm', osm, true);
+  bindToggle('ly-orto', orto, true);
+  bindToggle('ly-drzew', drzew);
+  bindToggle('ly-niezal', niezal);
+  bindToggle('ly-podzial', podzial);
+  bindToggle('ly-zakazy', zakazy);
+
+  document.getElementById('btn-home').addEventListener('click', function () {
+    map.setView(CENTER, ZOOM);
+  });
+  document.getElementById('btn-loc').addEventListener('click', function () {
+    if (!navigator.geolocation) {
+      setStatus('Brak GPS w tej przeglądarce');
+      return;
+    }
+    setStatus('Szukam lokalizacji…');
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var ll = [pos.coords.latitude, pos.coords.longitude];
+      map.setView(ll, 14);
+      L.circleMarker(ll, {
+        radius: 7, color: '#e9c46a', weight: 2, fillColor: '#f4a261', fillOpacity: 0.9
+      }).addTo(map).bindPopup('Tu jesteś').openPopup();
+      setStatus('Lokalizacja OK (±' + Math.round(pos.coords.accuracy) + ' m)');
+    }, function () {
+      setStatus('Nie udało się pobrać lokalizacji (zgoda?)');
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  });
+
+  // CORS probe (fetch) — informational; display uses <img> tiles anyway
+  var probeUrl =
+    'https://mapserver.bdl.lasy.gov.pl/arcgis/services/WMS_BDL_mapa_drzewostanow/MapServer/WMSServer'
+    + '?SERVICE=WMS&REQUEST=GetCapabilities';
+  fetch(probeUrl, { method: 'GET', mode: 'cors' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      corsBadge.textContent = 'CORS OK';
+      corsBadge.className = 'badge ok';
+      setStatus('Augustów · zoom ' + ZOOM + ' · WMS online');
+    })
+    .catch(function () {
+      corsBadge.textContent = 'CORS / sieć?';
+      corsBadge.className = 'badge warn';
+      setStatus('OSM może działać; WMS sprawdź w zakładce Aplikacje');
+    });
+
+  // Detect file:// 
+  if (location.protocol === 'file:') {
+    setStatus('Plik lokalny (iCloud/Pliki) · potrzebny internet na WMS/OSM');
+  }
+})();
+  </script>
+</body>
+</html>
